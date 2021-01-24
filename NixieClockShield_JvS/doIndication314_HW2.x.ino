@@ -171,9 +171,9 @@ word doEditBlink(int pos)
     else tmp = blinkMask;
   }
   if (((dotPattern & ~tmp) >> 6) & 1 == 1) LD = true; //digitalWrite(pinLowerDots, HIGH);
-  else LD = false; //digitalWrite(pinLowerDots, LOW);
+    else LD = false; //digitalWrite(pinLowerDots, LOW);
   if (((dotPattern & ~tmp) >> 7) & 1 == 1) UD = true; //digitalWrite(pinUpperDots, HIGH);
-  else UD = false; //digitalWrite(pinUpperDots, LOW);
+    else UD = false; //digitalWrite(pinUpperDots, LOW);
 
   if ((blinkState == true) && (lowBit == 1)) mask = 0x3C00; //mask=B11111111;
   //Serial.print("doeditblinkMask=");
