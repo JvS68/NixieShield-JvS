@@ -83,21 +83,33 @@ void doIndication()
 
   //--Reg1--
   var32_H = 0;
-  var32_H |= (unsigned long)(SymbolArray[digits % 10]) << 20; // s2
+  var32_H |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(5)) << 20; // s2
   digits = digits / 10;
-  var32_H |= (unsigned long)(SymbolArray[digits % 10]) << 10; //s1
+  var32_H |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(4)) << 10; //s1
   digits = digits / 10;
-  var32_H |= (unsigned long)(SymbolArray[digits % 10]); //m2
+  var32_H |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(3)); //m2
   digits = digits / 10;
+
+  if (LD) var32_H|=LowerDotsMask;
+    else  var32_H&=~LowerDotsMask;
+  
+  if (UD) var32_H|=UpperDotsMask;
+    else var32_H&=~UpperDotsMask;
 
   //--Reg0--
   var32_L = 0;
-  var32_L |= (unsigned long)(SymbolArray[digits % 10]) << 20; // m1
+  var32_L |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(2)) << 20; // m1
   digits = digits / 10;
-  var32_L |= (unsigned long)(SymbolArray[digits % 10]) << 10; //h2
+  var32_L |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(1)) << 10; //h2
   digits = digits / 10;
-  var32_L |= (unsigned long)SymbolArray[digits % 10]; //h1
+  var32_L |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(0)); //h1
   digits = digits / 10;
+
+  if (LD) var32_L|=LowerDotsMask;
+    else  var32_L&=~LowerDotsMask;
+  
+  if (UD) var32_L|=UpperDotsMask;
+    else var32_L&=~UpperDotsMask;  
 
   digitalWrite(LEpin, LOW);
   SPI.transfer(var32_H >> 24);
