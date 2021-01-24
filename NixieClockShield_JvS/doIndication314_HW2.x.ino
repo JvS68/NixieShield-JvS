@@ -31,6 +31,7 @@ void doIndication()
   static int           overallFrameCounter;                   //used to keep track of how many frames we already did in the cuurent fadecycle
   static int           lastSecond = second();
   static bool          fadeInProgress = false;                //keep track wether we have a fade transaction going, this to make sure we don't start the next one before this one is finished
+  static bool          dotsOn = false;                        //for normal blinking (not in edit mode), turn on or off once per second (so 2 second rithm)
   long digits;                                                //used in translation of stringtodisplay to bitpattern
   unsigned long var32_L = 0;                                  //Will hold 2nd 32 bits to send over
   unsigned long var32_H = 0;                                  //Will hold 1st 32 bits to send over
@@ -41,6 +42,7 @@ void doIndication()
 
   if (lastSecond != second()) {                 //initialize fade for next timeposition
     if (fadeInProgress) nominalFPS--;           //we used more frames than fit in 1 second, tune down a bit.
+    dotsOn = !dotsOn;                           //turn the dots on or off
     fadeInProgress = true;
     FPSTuner = millis();                        //keep track of how long the fade takes, for autotuning. Works tw. nominalFPS (in.h file)
     fadeFrameCounter = 0;
@@ -90,11 +92,20 @@ void doIndication()
   var32_H |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(3)); //m2
   digits = digits / 10;
 
-  if (LD) var32_H|=LowerDotsMask;
-    else  var32_H&=~LowerDotsMask;
-  
-  if (UD) var32_H|=UpperDotsMask;
+  if (menuPosition == TimeIndex) {                    //we are in normal timekeeping mode, blink dots with the seconds
+    if (dotsOn & !transactionInProgress) {
+      var32_H|=LowerDotsMask;
+      var32_H|=UpperDotsMask;
+    } else {
+      var32_H&=~LowerDotsMask;
+      var32_H&=~UpperDotsMask;
+    }
+  } else {                                            //we are in edit mode, dot control is with the edit process
+    if (LD) var32_H|=LowerDotsMask;
+      else  var32_H&=~LowerDotsMask;
+    if (UD) var32_H|=UpperDotsMask;
     else var32_H&=~UpperDotsMask;
+  }
 
   //--Reg0--
   var32_L = 0;
@@ -105,11 +116,21 @@ void doIndication()
   var32_L |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(0)); //h1
   digits = digits / 10;
 
-  if (LD) var32_L|=LowerDotsMask;
-    else  var32_L&=~LowerDotsMask;
-  
-  if (UD) var32_L|=UpperDotsMask;
-    else var32_L&=~UpperDotsMask;  
+
+  if (menuPosition == TimeIndex) {                      //we are in normal timekeeping mode, blink dots with the seconds
+    if (dotsOn & !transactionInProgress) {
+      var32_L|=LowerDotsMask;
+      var32_L|=UpperDotsMask;
+    } else {
+      var32_L&=~LowerDotsMask;
+      var32_L&=~UpperDotsMask;
+    }
+  } else {                                              //we are in edit mode, dot control is with the edit process
+    if (LD) var32_L|=LowerDotsMask;
+      else  var32_L&=~LowerDotsMask;
+    if (UD) var32_L|=UpperDotsMask;
+      else var32_L&=~UpperDotsMask;
+  }
 
   digitalWrite(LEpin, LOW);
   SPI.transfer(var32_H >> 24);
