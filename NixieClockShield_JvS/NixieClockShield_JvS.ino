@@ -184,8 +184,9 @@ bool RTC_present;
 OneWire ds(pinTemp);
 bool TempPresent = false;
 
-String stringToDisplay = "000000";                     // Content of this string will be displayed on tubes (must be 6 chars length)
+static String stringToDisplay = "000000";              //Content of this string will be displayed on tubes (must be 6 chars length)
 static String prevstringToDisplay = "000000";          //addtl code for fade effect
+static bool newNumber;                                 //Do we start a new number (second really)
 
 int menuPosition = 0;
 // 0 - time
@@ -789,6 +790,7 @@ String updateDisplayString()
   if (second() != prevS)
   {
     prevstringToDisplay = stringToDisplay;
+    newNumber=true;
     prevS = second();
     return getTimeNow();
   } else return stringToDisplay;

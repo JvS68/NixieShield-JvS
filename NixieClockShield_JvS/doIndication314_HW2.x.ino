@@ -24,6 +24,7 @@ void doIndication()
 
   static unsigned long lastTimeInterval1Started;
   static unsigned long lastTimeInterval2Started;
+  static unsigned long nominalFPS=2250  ;                        //start conservative, the actual FPS will autotune and right itself in a short while.
 
   static unsigned long FPSTuner;                              //Used to autotune number of frames that fit in a minute
   static int           currentFadeCycle;                      //we want to progressively make new digit brighter so cycles need to go up. Will be calculated every frame
@@ -32,15 +33,21 @@ void doIndication()
   static int           lastSecond = second();
   static bool          fadeInProgress = false;                //keep track wether we have a fade transaction going, this to make sure we don't start the next one before this one is finished
   static bool          dotsOn = false;                        //for normal blinking (not in edit mode), turn on or off once per second (so 2 second rithm)
+
+  static unsigned long pstring_var32_L = 0;                   //store the bit pattern of the prevstringToDisplay so we can reuse
+  static unsigned long pstring_var32_H = 0;                   //store the bit pattern of the prevstringToDisplay so we can reuse
+  static unsigned long cstring_var32_L = 0;                   //store the bit pattern of the stringToDisplay so we can reuse
+  static unsigned long cstring_var32_H = 0;                   //store the bit pattern of the stringToDisplay so we can reuse
+
   long digits;                                                //used in translation of stringtodisplay to bitpattern
   unsigned long var32_L = 0;                                  //Will hold 2nd 32 bits to send over
   unsigned long var32_H = 0;                                  //Will hold 1st 32 bits to send over
 
   //if ((micros() - lastTimeInterval1Started) < fpsLimit) return;
 
-  digits = stringToDisplay.toInt();
 
-  if (lastSecond != second()) {                 //initialize fade for next timeposition
+
+  if (newNumber) {                              //initialize fade for next timeposition
     if (fadeInProgress) nominalFPS--;           //we used more frames than fit in 1 second, tune down a bit.
     dotsOn = !dotsOn;                           //turn the dots on or off
     fadeInProgress = true;
@@ -48,88 +55,124 @@ void doIndication()
     fadeFrameCounter = 0;
     overallFrameCounter = 0;
     lastSecond=second();
-    Serial.println("Start fade transaction");
+
+    digits = stringToDisplay.toInt();
+    //--Reg1 for stringToDisplay--
+    cstring_var32_H = 0;
+    cstring_var32_H |= (unsigned long)(SymbolArray[digits % 10]) << 20; // s2
+    digits = digits / 10;
+    cstring_var32_H |= (unsigned long)(SymbolArray[digits % 10]) << 10; //s1
+    digits = digits / 10;
+    cstring_var32_H |= (unsigned long)(SymbolArray[digits % 10]); //m2
+    digits = digits / 10;
+
+    //--Reg0 for stringToDisplay--
+    cstring_var32_L = 0;
+    cstring_var32_L |= (unsigned long)(SymbolArray[digits % 10]) << 20; // m1
+    digits = digits / 10;
+    cstring_var32_L |= (unsigned long)(SymbolArray[digits % 10]) << 10; //h2
+    digits = digits / 10;
+    cstring_var32_L |= (unsigned long)SymbolArray[digits % 10]; //h1
+    digits = digits / 10;
+
+    digits = prevstringToDisplay.toInt();
+    //--Reg1 for prevstringToDisplay--
+    pstring_var32_H = 0;
+    pstring_var32_H |= (unsigned long)(SymbolArray[digits % 10]) << 20; // s2
+    digits = digits / 10;
+    pstring_var32_H |= (unsigned long)(SymbolArray[digits % 10]) << 10; //s1
+    digits = digits / 10;
+    pstring_var32_H |= (unsigned long)(SymbolArray[digits % 10]); //m2
+    digits = digits / 10;
+
+    //--Reg0 for prevstringToDisplay--
+    pstring_var32_L = 0;
+    pstring_var32_L |= (unsigned long)(SymbolArray[digits % 10]) << 20; // m1
+    digits = digits / 10;
+    pstring_var32_L |= (unsigned long)(SymbolArray[digits % 10]) << 10; //h2
+    digits = digits / 10;
+    pstring_var32_L |= (unsigned long)SymbolArray[digits % 10]; //h1
+    digits = digits / 10;
+
+    newNumber = false;
   }
 
-  if ((menuPosition == TimeIndex) & !transactionInProgress & fadeInProgress) {
+  if ((menuPosition == TimeIndex) & !transactionInProgress) {  //we are in timedisplay mode
     if (overallFrameCounter <= nominalFPS / 2) {
       currentFadeCycle = ((float)nominalFPS / (float)overallFrameCounter);
       if (fadeFrameCounter >= currentFadeCycle) {
-        digits = stringToDisplay.toInt();
+        var32_L = cstring_var32_L;
+        var32_H = cstring_var32_H;
         fadeFrameCounter = 0;
       } else {
-        digits = prevstringToDisplay.toInt();
+        var32_L = pstring_var32_L;
+        var32_H = pstring_var32_H;
       }
     }  else {
       currentFadeCycle = (float)nominalFPS / ((float)nominalFPS - (float)overallFrameCounter);
       if (fadeFrameCounter >= currentFadeCycle) {
-        digits = prevstringToDisplay.toInt();
+        var32_L = pstring_var32_L;
+        var32_H = pstring_var32_H;
         fadeFrameCounter = 0;
       } else {
-        digits = stringToDisplay.toInt();
+        var32_L = cstring_var32_L;
+        var32_H = cstring_var32_H;
       }
     }
-    fadeFrameCounter++;                                 //up the framecounter
-    overallFrameCounter++;                              //up the overall frame counter
-  }
 
-  if (overallFrameCounter >= nominalFPS) {              //the fade has finished, clean up
-    fadeInProgress = false;
-    
-    //Correct nominalFPS based on actual time spent
-    if ((millis() - FPSTuner) < 1000) {
-      nominalFPS++;                                  //We spent less than a second, increase number of frames in a second
-    }
-    Serial.println(nominalFPS);
-  }
-
-  //--Reg1--
-  var32_H = 0;
-  var32_H |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(5)) << 20; // s2
-  digits = digits / 10;
-  var32_H |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(4)) << 10; //s1
-  digits = digits / 10;
-  var32_H |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(3)); //m2
-  digits = digits / 10;
-
-  if (menuPosition == TimeIndex) {                    //we are in normal timekeeping mode, blink dots with the seconds
-    if (dotsOn & !transactionInProgress) {
+    if (dotsOn) {                                      //regular timekeep, blink the dots
       var32_H|=LowerDotsMask;
       var32_H|=UpperDotsMask;
-    } else {
-      var32_H&=~LowerDotsMask;
-      var32_H&=~UpperDotsMask;
-    }
-  } else {                                            //we are in edit mode, dot control is with the edit process
-    if (LD) var32_H|=LowerDotsMask;
-      else  var32_H&=~LowerDotsMask;
-    if (UD) var32_H|=UpperDotsMask;
-    else var32_H&=~UpperDotsMask;
-  }
-
-  //--Reg0--
-  var32_L = 0;
-  var32_L |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(2)) << 20; // m1
-  digits = digits / 10;
-  var32_L |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(1)) << 10; //h2
-  digits = digits / 10;
-  var32_L |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(0)); //h1
-  digits = digits / 10;
-
-
-  if (menuPosition == TimeIndex) {                      //we are in normal timekeeping mode, blink dots with the seconds
-    if (dotsOn & !transactionInProgress) {
       var32_L|=LowerDotsMask;
       var32_L|=UpperDotsMask;
     } else {
+      var32_H&=~LowerDotsMask;
+      var32_H&=~UpperDotsMask;
       var32_L&=~LowerDotsMask;
       var32_L&=~UpperDotsMask;
     }
-  } else {                                              //we are in edit mode, dot control is with the edit process
+
+    fadeFrameCounter++;                                 //up the framecounter within current fadecycle
+    overallFrameCounter++;                              //up the overall frame counter
+  } 
+
+  if (menuPosition != TimeIndex || transactionInProgress) {                                              //we are not in time displaymode
+    digits = stringToDisplay.toInt();
+    var32_H = 0;
+    var32_H |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(5)) << 20; // s2
+    digits = digits / 10;
+    var32_H |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(4)) << 10; //s1
+    digits = digits / 10;
+    var32_H |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(3)); //m2
+    digits = digits / 10;
+
+    if (LD) var32_H|=LowerDotsMask;
+      else  var32_H&=~LowerDotsMask;
+    if (UD) var32_H|=UpperDotsMask;
+      else var32_H&=~UpperDotsMask;
+
+    var32_L = 0;
+    var32_L |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(2)) << 20; // m1
+    digits = digits / 10;
+    var32_L |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(1)) << 10; //h2
+    digits = digits / 10;
+    var32_L |= (unsigned long)(SymbolArray[digits % 10]&doEditBlink(0)); //h1
+    digits = digits / 10;
+
     if (LD) var32_L|=LowerDotsMask;
       else  var32_L&=~LowerDotsMask;
     if (UD) var32_L|=UpperDotsMask;
       else var32_L&=~UpperDotsMask;
+  }
+
+  if (overallFrameCounter >= nominalFPS) {                //the fade has finished, clean up
+    fadeInProgress = false;
+    
+    if ((millis() - FPSTuner) < 1000) {                  //Correct nominalFPS based on actual time spent
+      nominalFPS++;                                      //We spent less than a second, increase number of frames in a second
+    }
+    Serial.println(millis() - FPSTuner);
+    Serial.println(nominalFPS);
   }
 
   digitalWrite(LEpin, LOW);
