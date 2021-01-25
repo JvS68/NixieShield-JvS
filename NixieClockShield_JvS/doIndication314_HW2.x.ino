@@ -171,7 +171,6 @@ void doIndication()
     if ((millis() - FPSTuner) < 1000) {                  //Correct nominalFPS based on actual time spent
       nominalFPS++;                                      //We spent less than a second, increase number of frames in a second
     }
-    Serial.println(millis() - FPSTuner);
     Serial.println(nominalFPS);
   }
 
