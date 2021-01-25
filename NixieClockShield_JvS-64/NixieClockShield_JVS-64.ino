@@ -822,6 +822,7 @@ String getTimeNow()
 
 void doTest()
 {
+  transactionInProgress = true;
   Serial.print(F("Firmware version: "));
   Serial.println(FirmwareVersion.substring(1,2)+"."+FirmwareVersion.substring(2,5));
   Serial.println(HardwareVersion);
@@ -872,6 +873,7 @@ void doTest()
   } else TempPresent=true;
   
   Serial.println(F("Stop Test"));
+  transactionInProgress = false;
  // while(1);
 }
 
