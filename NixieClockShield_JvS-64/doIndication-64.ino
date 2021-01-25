@@ -24,7 +24,7 @@ void doIndication()
 
   static unsigned long lastTimeInterval1Started;
   static unsigned long lastTimeInterval2Started;
-  static unsigned long nominalFPS=1800;                       //start conservative, the actual FPS will autotune and right itself in a short while.
+  static unsigned long nominalFPS=2000;                       //start conservative, the actual FPS will autotune and right itself in a short while.
 
   static unsigned long FPSTuner;                              //Used to autotune number of frames that fit in a minute
   static int           currentFadeCycle;                      //we want to progressively make new digit brighter so cycles need to go up. Will be calculated every frame
