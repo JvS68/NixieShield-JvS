@@ -13,4 +13,5 @@ Most notable changes:
 
 Credits:
 - Gra&Afch for the original code
-- 
+- buildxyx --> buildxyz-git/nixiclock_ncs314 for the NTP sync & Wifi code and the option to automatically switch off the clock at night
+
