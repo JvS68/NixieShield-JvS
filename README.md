@@ -22,5 +22,5 @@ Button handling now is:
 
 Notes:
 - Clock is set to CET and CEST standard, uses the timezone library. Easy to adapt to your own timezone, see .h file
-- Because of the fading code the clock tunes itself when turned on for the 1st muinute or 2, this to get the fades exactly in sync with the time. This can cause the seconds to jump a few times in the first few minutes. After that this is gone.
+- Because of the fading code the clock tunes itself when turned on for the 1st minute or 2, this to get the fades exactly in sync with the time. This can cause the seconds to jump a few times in the first few minutes. After that this is gone.
 
