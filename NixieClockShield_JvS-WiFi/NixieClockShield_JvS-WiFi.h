@@ -26,7 +26,7 @@
 
 #define DS1307_ADDRESS 				0x68
 
-#define timeModePeriod 60000
+#define SLOTMACHINEBETWEENTIME      300000		//Time between slot machine iterations
 #define dateModePeriod 5000
 
 // EEPROM Addresses
@@ -67,7 +67,7 @@
 #define TON_MINUTE     			15
 #define TT_ON         			16
 
-int storedValues[TT_ON];
+int storedValues[TT_ON+1];
 
 #define US_DF		 				1
 #define EU_DF		 				0

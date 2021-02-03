@@ -104,7 +104,7 @@ void doIndication()
     overallFrameCounter++;                              //up the overall frame counter
   } 
 
-  if (menuPosition != TIMEINDEX || transactionInProgress) {         //we are not in time displaymode and not in a transaction --> some sort of edit mode. We don't want to fade now!
+  if (editMode || modeChanger || transactionInProgress) {              //editMode or transaction --> no fading
     digits = stringToDisplay.toInt();
     createBitPattern(&digits, &var32_H, &var32_L);                  //fill the bitpattern for the requested string
 

@@ -69,10 +69,9 @@ void setRTCDateTime(byte h, byte m, byte s, byte d, byte mon, byte y, byte w = 1
 
 bool LEDsLock = false;
 
-//antipoisoning transaction
-bool transactionInProgress = false; //antipoisoning or startup-test transaction in progress
-long modesChangePeriod = timeModePeriod;
-//end of antipoisoning transaction
+//special transaction handling
+bool transactionInProgress = false; //antipoisoning or startup-test transaction in progress iow a 'special' situation. doIndication needs to know!
+
 
 extern const int LEDsDelay;
 
@@ -213,6 +212,8 @@ void init_EEPROM()
   if (EEPROM.read(TT_ON_MM_EEPROM_ADDR) > 60) { storedValues[TON_MINUTE] = 0; } else { storedValues[TON_MINUTE] = EEPROM.read(TT_ON_MM_EEPROM_ADDR); }
   if (EEPROM.read(TT_ENABLE_EEPROM_ADDR) > 1) { storedValues[TT_ON] = 1; } else { storedValues[TT_ON] = EEPROM.read(TT_ENABLE_EEPROM_ADDR); }
 
+  randomSeed(hour() + minute() + second());
+
   Serial.println("Fromn EEPROM:" + String(storedValues[TT_ON]));
 
 }
@@ -261,10 +262,15 @@ void checkTubeTimers()
 
       if (!TubesOn) {
         RGBLedsOn = ledState;  // we're switching on, restore state of the leds
+        if (RGBLedsOn) {
+          EEPROM.write(RGB_EEPROM_ADDR, 1);
+          analogWrite(RedLedPin, EEPROM.read(LEDREDVAL_EEPROM_ADDR));
+          analogWrite(GreenLedPin, EEPROM.read(LEDGREENVAL_EEPROM_ADDR));
+          analogWrite(BlueLedPin, EEPROM.read(LEDBLUEVAL_EEPROM_ADDR));
         }
+      }
 
       TubesOn = true;
-      RGBLedsOn = ledState;
     
       #ifdef DEBUG
       Serial.println("[!] TubeTimer ON Triggered");
@@ -353,6 +359,97 @@ void ntp_rtcupdate()
 
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // End of NTP code
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Start of slotmachine code
+
+void slotMachine()
+{
+  static unsigned long timeToNextStep = SLOTMACHINEBETWEENTIME;
+  static unsigned long timeOfLastStep = millis();
+  static unsigned long lastSpin;
+  static int           spinCounter, spinSpeed, slowDown, slowest;
+  static int           stepCounter = 0;                // step 1) morph to date step 2) stay in date for x period step 3) morph back to time
+  static bool          spinInProgress = false;
+  static bool          newRound = false;
+  static int           f_d[6], t_d[6], iterations_d[6], speed[6];
+
+  if (editMode || modeChanger) return;                 //if user is fiddling with the buttons not going to do this
+
+  if( ((millis() - timeOfLastStep) > timeToNextStep) && !transactionInProgress) {    //Execute the next step in the slotmachine process
+    stepCounter = 1;                                                                  //new slotspin, goto stepCounter = 1
+    newRound = true;
+    spinInProgress = true;
+    transactionInProgress = true;
+  } //end of execute next step
+
+  if (transactionInProgress) {
+    if (spinInProgress) {
+      //either spinning up or down (case 1 or 2)
+      switch (stepCounter) {
+        case 1:                                       //morph to date
+          if (newRound) {                             //determine digits we want to spin from and to
+            slowDown = 50;                            
+            spinCounter = 20;                         //minimum 20 spins
+            slowest = 6;                              //max # of pauses between digits, more = too slow. Works in conjunction with the millis() check. Tune to personal preference
+            String cDateTmp = preZero(day()) + preZero(month()) + preZero(year()-2000);
+            for (int i=0; i<6; i++) {
+              f_d[i] = (stringToDisplay.substring(i,i+1)).toInt();
+              t_d[i] = (cDateTmp.substring(i,i+1)).toInt();
+              //iterations_d[i] = (spincounter + (i*20) + (t_d[i] - f_d[i]));       //how many times, spincounter +10 extra per sigit + difference
+              iterations_d[i] = (spinCounter + (slowDown*i) + (t_d[i] - f_d[i]));
+              speed[i] = 0;
+            }
+            newRound=false;
+            lastSpin = millis();
+          }
+
+          if ((millis() - lastSpin) > 50) {                            //up the digits
+            for (int i=0; i<6; i++) {
+              if (iterations_d[i] < 10 && iterations_d[i] > 0) {    //need to slow down for this digit - last 10 iterations
+                if (speed[i] >= (10 - iterations_d[i]) || speed[i] >= slowest) {
+                  f_d[i]++; if (f_d[i] > 9) f_d[i]=0;
+                  iterations_d[i]--;
+                  speed[i] = 0;
+                } else speed[i]++;                                 //no new number yet, slowing down
+              } else {                                            //At full speed or full stop
+                if (iterations_d[i] != 0) {
+                  iterations_d[i]--;
+                  f_d[i]++;  if (f_d[i] > 9) f_d[i]=0;
+                }
+              }
+            }
+            //            if (spinSpeed < 110) spinSpeed++;
+            stringToDisplay = preZero((f_d[0]*10) + f_d[1]) + preZero((f_d[2]*10) + f_d[3]) + preZero((f_d[4]*10) + f_d[5]);
+            if (iterations_d[5] == 0) {                        //done spinning last digit
+              stepCounter = 2;
+              timeOfLastStep = millis();
+              timeToNextStep = 3000;
+              spinInProgress = false;
+            }
+            lastSpin = millis();
+          }
+        break;
+        case 3:
+          //Here we do the spin down
+          transactionInProgress = false;
+          timeToNextStep = random(60000, SLOTMACHINEBETWEENTIME);
+          //timeToNextStep = SLOTMACHINEBETWEENTIME;
+          timeOfLastStep = millis();
+        break;
+      }  // end switch (dit kan handiger)
+    } else {
+      //we are in step 2, showing the date
+      if (millis() - timeOfLastStep > timeToNextStep) {
+        stepCounter = 3;                                        //stepcounter will now be 3 --> spin down
+        spinInProgress = true;
+        newRound = true;
+      }
+    }
+  }
+} //end void slotMachine()
+// End of slotmachine code
+// ------------------------------------------------------------------------------------------------------
+
 
 String preZero(int digit)
 {
@@ -703,80 +800,6 @@ void checkAlarmTime()
     Serial.println(F("Wake up, Neo!"));
     p = song;
   }
-}
-
-void slotMachine()
-{
-  if (editMode == true || modeChanger == true) return;
-  static unsigned long lastTimeModeChanged = millis();
-  static unsigned long lastTimeAntiPoisoningIterate = millis();
-  static int transnumber = 0;
-  if ((millis() - lastTimeModeChanged) > modesChangePeriod)
-  {
-    lastTimeModeChanged = millis();
-    if (transnumber == 0) {
-      menuPosition = DATEINDEX;
-      modesChangePeriod = dateModePeriod;
-    }
-    if (transnumber == 1) {
-      menuPosition = TIMEINDEX;
-      modesChangePeriod = timeModePeriod;
-    }
-    transnumber++;
-    if (transnumber > 1) transnumber = 0;
-
-    if (modeChanger == true)
-    {
-      menuPosition = TIMEINDEX;
-    }
-    modeChanger = false;
-  }
-  if ((millis() - lastTimeModeChanged) < 2000)
-  {
-    if ((millis() - lastTimeAntiPoisoningIterate) > 100)
-    {
-      lastTimeAntiPoisoningIterate = millis();
-      if (menuPosition == TIMEINDEX) stringToDisplay = antiPoisoning2(preZero(day()) + preZero(month()) + preZero(year() % 1000), getTimeNow());
-      if (menuPosition == DATEINDEX) stringToDisplay = antiPoisoning2(getTimeNow(), preZero(day()) + preZero(month()) + preZero(year() % 1000) );
-      // Serial.println("StrTDInToModeChng="+stringToDisplay);
-    }
-  } else {
-    transactionInProgress = false;
-  }
-}
-
-String antiPoisoning2(String fromStr, String toStr)
-{
-  //static bool transactionInProgress=false;
-  //byte fromDigits[6];
-  static byte toDigits[6];
-  static byte currentDigits[6];
-  static byte iterationCounter = 0;
-  if (!transactionInProgress)
-  {
-    transactionInProgress = true;
-    for (int i = 0; i < 6; i++)
-    {
-      currentDigits[i] = fromStr.substring(i, i + 1).toInt();
-      toDigits[i] = toStr.substring(i, i + 1).toInt();
-    }
-  }
-  for (int i = 0; i < 6; i++)
-  {
-    if (iterationCounter < 10) currentDigits[i]++;
-    else if (currentDigits[i] != toDigits[i]) currentDigits[i]++;
-    if (currentDigits[i] == 10) currentDigits[i] = 0;
-  }
-  iterationCounter++;
-  if (iterationCounter == 20)
-  {
-    iterationCounter = 0;
-    transactionInProgress = false;
-  }
-  String tmpStr;
-  for (int i = 0; i < 6; i++)
-    tmpStr += currentDigits[i];
-  return tmpStr;
 }
 
 

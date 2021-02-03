@@ -115,8 +115,8 @@ void handleButtons() {
             storedValues[A_SECOND]  = 0;
             storedValues[A_ON]      = editValues[2];
             EEPROM.write(ALARMTIME_EEPROM_ADDR, storedValues[A_HOUR]);
-            EEPROM.write(ALARMTIME_EEPROM_ADDR + 1, storedValues[A_MINUTE]);
-            EEPROM.write(ALARMTIME_EEPROM_ADDR + 2, storedValues[A_SECOND]);
+            EEPROM.write((ALARMTIME_EEPROM_ADDR + 1), storedValues[A_MINUTE]);
+            EEPROM.write((ALARMTIME_EEPROM_ADDR + 2), storedValues[A_SECOND]);
             EEPROM.write(ALARMARMED_EEPROM_ADDR, storedValues[A_ON]);
             editMode = false;
             return;
@@ -155,6 +155,7 @@ void handleButtons() {
         } else if (editIndex == 2 || editIndex == 3) {
           stringToDisplay = preZero(editValues[2]) + preZero(editValues[3]) + "00";   //Tubetimer on time
         } else if (editIndex == 4) {
+          Serial.println("Entering Edit2, editValues[4] = " + String(editValues[4]));
           stringToDisplay = "00" + preZero(editValues[4]) + "00";                     //Tubetimer on(1) or off(0)
         }
         blinkMask = editBlinkMask[editIndex];
@@ -356,6 +357,8 @@ void handleButtons() {
       EEPROM.write(LEDREDVAL_EEPROM_ADDR, RedLight);
       EEPROM.write(LEDGREENVAL_EEPROM_ADDR, GreenLight);
       EEPROM.write(LEDBLUEVAL_EEPROM_ADDR, BlueLight);
+    } else {
+      EEPROM.write(LEDLOCK_EEPROM_ADDR, 0);
     }
     return;
   }
@@ -365,9 +368,12 @@ void handleButtons() {
     tone1.play(1000, 100);
     RGBLedsOn = true;
     EEPROM.write(RGB_EEPROM_ADDR, 1);
+    analogWrite(RedLedPin, EEPROM.read(LEDREDVAL_EEPROM_ADDR));
+    analogWrite(GreenLedPin, EEPROM.read(LEDGREENVAL_EEPROM_ADDR));
+    analogWrite(BlueLedPin, EEPROM.read(LEDBLUEVAL_EEPROM_ADDR));
     return;
   }
-  //---------END SHORT PRESS CODE, NOT IN SPECIAL MODE-------
+  //---------END PRESS CODE, NOT IN SPECIAL MODE------------
   //---------------------------------------------------------
 } //---------END BUTTONHANDLER CODE
 
